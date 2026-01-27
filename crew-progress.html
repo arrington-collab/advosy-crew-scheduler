@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Job Progress Update</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        .header p {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+        .job-info {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .job-info h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .job-info .address {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        .job-info .details {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+        }
+        .job-info .details span {
+            color: #f97316;
+            font-weight: 600;
+        }
+        
+        /* Progress Steps */
+        .progress-track {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        .progress-track::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 10%;
+            right: 10%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            z-index: 0;
+        }
+        .progress-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 1;
+            flex: 1;
+        }
+        .progress-step .icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin-bottom: 8px;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        .progress-step.completed .icon {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            border-color: #22c55e;
+        }
+        .progress-step.current .icon {
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            border-color: #f97316;
+            animation: pulse 2s infinite;
+        }
+        .progress-step .label {
+            font-size: 11px;
+            color: #94a3b8;
+            text-align: center;
+        }
+        .progress-step.completed .label,
+        .progress-step.current .label {
+            color: white;
+            font-weight: 600;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(249, 115, 22, 0); }
+        }
+        
+        /* Milestone Selection */
+        .milestone-section {
+            margin-bottom: 20px;
+        }
+        .milestone-section h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #e2e8f0;
+        }
+        .milestone-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .milestone-btn {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 20px 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .milestone-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .milestone-btn.selected {
+            border-color: #f97316;
+            background: rgba(249, 115, 22, 0.1);
+        }
+        .milestone-btn.completed {
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        .milestone-btn .emoji {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        .milestone-btn .name {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .milestone-btn .time {
+            font-size: 11px;
+            color: #22c55e;
+        }
+        .milestone-btn.completed .name {
+            color: #22c55e;
+        }
+        
+        /* Photo Upload */
+        .photo-section {
+            margin-bottom: 20px;
+        }
+        .photo-section h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #e2e8f0;
+        }
+        .photo-upload {
+            background: rgba(255,255,255,0.05);
+            border: 2px dashed rgba(255,255,255,0.2);
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .photo-upload:hover {
+            border-color: #f97316;
+            background: rgba(249, 115, 22, 0.05);
+        }
+        .photo-upload.has-photo {
+            padding: 10px;
+            border-style: solid;
+            border-color: #22c55e;
+        }
+        .photo-upload .camera-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .photo-upload p {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+        .photo-upload input {
+            display: none;
+        }
+        .photo-preview {
+            max-width: 100%;
+            border-radius: 12px;
+        }
+        .photo-preview-container {
+            position: relative;
+        }
+        .remove-photo {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        
+        /* Notes */
+        .notes-section {
+            margin-bottom: 20px;
+        }
+        .notes-section h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #e2e8f0;
+        }
+        .notes-input {
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 15px;
+            color: white;
+            font-family: inherit;
+            font-size: 14px;
+            resize: none;
+        }
+        .notes-input::placeholder {
+            color: #64748b;
+        }
+        .notes-input:focus {
+            outline: none;
+            border-color: #f97316;
+        }
+        
+        /* Submit Button */
+        .submit-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            border: none;
+            border-radius: 16px;
+            padding: 18px;
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(249, 115, 22, 0.3);
+        }
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        /* Success State */
+        .success-message {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        .success-message .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        .success-message h2 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #22c55e;
+        }
+        .success-message p {
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+        .success-message .next-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            padding: 15px 30px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .loading-overlay.hidden {
+            display: none;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #f97316;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Error */
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #f87171;
+            font-size: 14px;
+            display: none;
+        }
+        .error-message.show {
+            display: block;
+        }
+        
+        /* Language Toggle */
+        .lang-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .lang-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 8px 16px;
+            color: #94a3b8;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .lang-btn.active {
+            background: rgba(249, 115, 22, 0.2);
+            border-color: #f97316;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay hidden" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="container">
+        <!-- Language Toggle -->
+        <div class="lang-toggle">
+            <button class="lang-btn active" onclick="setLanguage('en')">English</button>
+            <button class="lang-btn" onclick="setLanguage('es')">Español</button>
+        </div>
+
+        <div class="header">
+            <h1 data-en="Job Progress Update" data-es="Actualización de Progreso">Job Progress Update</h1>
+            <p data-en="Submit photos for each milestone" data-es="Envía fotos de cada etapa">Submit photos for each milestone</p>
+        </div>
+
+        <!-- Job Info -->
+        <div class="job-info">
+            <h2 id="customer-name">Loading...</h2>
+            <div class="address" id="job-address">--</div>
+            <div class="details">
+                <div><span id="job-squares">--</span> SQ</div>
+                <div><span id="job-crew">--</span></div>
+            </div>
+        </div>
+
+        <!-- Progress Track -->
+        <div class="progress-track">
+            <div class="progress-step" id="step-arrival">
+                <div class="icon">🏠</div>
+                <div class="label" data-en="Arrival" data-es="Llegada">Arrival</div>
+            </div>
+            <div class="progress-step" id="step-tearoff">
+                <div class="icon">🔨</div>
+                <div class="label" data-en="Tear-Off" data-es="Remoción">Tear-Off</div>
+            </div>
+            <div class="progress-step" id="step-underlayment">
+                <div class="icon">📋</div>
+                <div class="label" data-en="Underlay" data-es="Base">Underlay</div>
+            </div>
+            <div class="progress-step" id="step-complete">
+                <div class="icon">✅</div>
+                <div class="label" data-en="Complete" data-es="Completo">Complete</div>
+            </div>
+        </div>
+
+        <!-- Main Form -->
+        <div id="form-container">
+            <div class="error-message" id="error-msg"></div>
+
+            <!-- Milestone Selection -->
+            <div class="milestone-section">
+                <h3 data-en="Select Milestone" data-es="Selecciona la Etapa">Select Milestone</h3>
+                <div class="milestone-buttons">
+                    <div class="milestone-btn" data-milestone="arrival" onclick="selectMilestone('arrival')">
+                        <div class="emoji">🏠</div>
+                        <div class="name" data-en="Arrival" data-es="Llegada">Arrival</div>
+                        <div class="time" id="time-arrival"></div>
+                    </div>
+                    <div class="milestone-btn" data-milestone="tearoff" onclick="selectMilestone('tearoff')">
+                        <div class="emoji">🔨</div>
+                        <div class="name" data-en="Tear-Off Done" data-es="Remoción Lista">Tear-Off Done</div>
+                        <div class="time" id="time-tearoff"></div>
+                    </div>
+                    <div class="milestone-btn" data-milestone="underlayment" onclick="selectMilestone('underlayment')">
+                        <div class="emoji">📋</div>
+                        <div class="name" data-en="Underlayment" data-es="Base Lista">Underlayment</div>
+                        <div class="time" id="time-underlayment"></div>
+                    </div>
+                    <div class="milestone-btn" data-milestone="complete" onclick="selectMilestone('complete')">
+                        <div class="emoji">✅</div>
+                        <div class="name" data-en="Roof Complete" data-es="Techo Completo">Roof Complete</div>
+                        <div class="time" id="time-complete"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Photo Upload -->
+            <div class="photo-section">
+                <h3 data-en="Take Photo" data-es="Tomar Foto">Take Photo</h3>
+                <div class="photo-upload" id="photo-upload" onclick="document.getElementById('photo-input').click()">
+                    <div class="camera-icon">📸</div>
+                    <p data-en="Tap to take or upload photo" data-es="Toca para tomar o subir foto">Tap to take or upload photo</p>
+                    <input type="file" id="photo-input" accept="image/*" capture="environment" onchange="handlePhotoSelect(event)">
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="notes-section">
+                <h3 data-en="Notes (Optional)" data-es="Notas (Opcional)">Notes (Optional)</h3>
+                <textarea class="notes-input" id="notes-input" rows="3" 
+                    placeholder="Any issues or updates..." 
+                    data-en-placeholder="Any issues or updates..."
+                    data-es-placeholder="¿Algún problema o actualización?"></textarea>
+            </div>
+
+            <!-- Submit -->
+            <button class="submit-btn" id="submit-btn" onclick="submitProgress()" disabled>
+                <span data-en="Submit Update" data-es="Enviar Actualización">Submit Update</span>
+            </button>
+        </div>
+
+        <!-- Success State -->
+        <div class="success-message" id="success-container" style="display: none;">
+            <div class="icon">✅</div>
+            <h2 data-en="Update Sent!" data-es="¡Actualización Enviada!">Update Sent!</h2>
+            <p data-en="Your progress has been recorded" data-es="Tu progreso ha sido registrado">Your progress has been recorded</p>
+            <button class="next-btn" onclick="resetForm()">
+                <span data-en="Submit Another Update" data-es="Enviar Otra Actualización">Submit Another Update</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Config
+        const CONFIG = {
+            webhookUrl: 'https://banc-r.app.n8n.cloud/webhook/crew-progress',
+            sheetUrl: 'https://docs.google.com/spreadsheets/d/1msoAfjZr2C8_PcpHL7hn4qv2rzgVPF4EsjAhPaIlcb8/gviz/tq?tqx=out:json&sheet=Jobs'
+        };
+
+        let currentLanguage = 'en';
+        let jobData = null;
+        let selectedMilestone = null;
+        let selectedPhoto = null;
+        let selectedPhotoBase64 = null;
+
+        // Get job_id from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const jobId = urlParams.get('job');
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!jobId) {
+                showError('No job ID provided. Please use the link from your SMS.');
+                return;
+            }
+            loadJobData();
+        });
+
+        // Load job data from sheet
+        async function loadJobData() {
+            try {
+                const response = await fetch(CONFIG.sheetUrl);
+                const text = await response.text();
+                const jsonString = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/)[1];
+                const data = JSON.parse(jsonString);
+                const rows = data.table.rows;
+                const cols = data.table.cols.map(c => c.label);
+
+                for (const row of rows) {
+                    const rowData = {};
+                    row.c.forEach((cell, i) => {
+                        rowData[cols[i]] = cell ? cell.v : null;
+                    });
+                    
+                    if (rowData.job_id === jobId) {
+                        jobData = rowData;
+                        break;
+                    }
+                }
+
+                if (!jobData) {
+                    showError('Job not found. Please check your link.');
+                    return;
+                }
+
+                displayJobInfo();
+                updateProgressTrack();
+                updateMilestoneButtons();
+
+            } catch (error) {
+                console.error('Failed to load job:', error);
+                showError('Failed to load job data. Please try again.');
+            }
+        }
+
+        // Display job info
+        function displayJobInfo() {
+            document.getElementById('customer-name').textContent = jobData.customer_name || '--';
+            document.getElementById('job-address').textContent = (jobData.address || '') + ', ' + (jobData.city || '');
+            document.getElementById('job-squares').textContent = jobData.squares || '--';
+            document.getElementById('job-crew').textContent = jobData.crew_id || '--';
+        }
+
+        // Update progress track based on completed milestones
+        function updateProgressTrack() {
+            const milestones = ['arrival', 'tearoff', 'underlayment', 'complete'];
+            let foundCurrent = false;
+
+            milestones.forEach(m => {
+                const step = document.getElementById('step-' + m);
+                const timeField = 'progress_' + m + '_time';
+                
+                if (jobData[timeField]) {
+                    step.classList.add('completed');
+                    step.classList.remove('current');
+                } else if (!foundCurrent) {
+                    step.classList.add('current');
+                    step.classList.remove('completed');
+                    foundCurrent = true;
+                } else {
+                    step.classList.remove('completed', 'current');
+                }
+            });
+        }
+
+        // Update milestone buttons
+        function updateMilestoneButtons() {
+            const milestones = ['arrival', 'tearoff', 'underlayment', 'complete'];
+            
+            milestones.forEach(m => {
+                const btn = document.querySelector(`[data-milestone="${m}"]`);
+                const timeField = 'progress_' + m + '_time';
+                const timeEl = document.getElementById('time-' + m);
+                
+                if (jobData[timeField]) {
+                    btn.classList.add('completed');
+                    const time = new Date(jobData[timeField]);
+                    timeEl.textContent = '✓ ' + time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                } else {
+                    btn.classList.remove('completed');
+                    timeEl.textContent = '';
+                }
+            });
+        }
+
+        // Select milestone
+        function selectMilestone(milestone) {
+            const btn = document.querySelector(`[data-milestone="${milestone}"]`);
+            if (btn.classList.contains('completed')) return;
+
+            // Deselect all
+            document.querySelectorAll('.milestone-btn').forEach(b => b.classList.remove('selected'));
+            
+            // Select this one
+            btn.classList.add('selected');
+            selectedMilestone = milestone;
+            
+            updateSubmitButton();
+        }
+
+        // Handle photo selection
+        function handlePhotoSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            selectedPhoto = file;
+
+            // Convert to base64
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                selectedPhotoBase64 = e.target.result;
+                
+                // Show preview
+                const uploadEl = document.getElementById('photo-upload');
+                uploadEl.classList.add('has-photo');
+                uploadEl.innerHTML = `
+                    <div class="photo-preview-container">
+                        <img src="${selectedPhotoBase64}" class="photo-preview" alt="Preview">
+                        <button class="remove-photo" onclick="removePhoto(event)">×</button>
+                    </div>
+                `;
+            };
+            reader.readAsDataURL(file);
+
+            updateSubmitButton();
+        }
+
+        // Remove photo
+        function removePhoto(event) {
+            event.stopPropagation();
+            selectedPhoto = null;
+            selectedPhotoBase64 = null;
+            
+            const uploadEl = document.getElementById('photo-upload');
+            uploadEl.classList.remove('has-photo');
+            uploadEl.innerHTML = `
+                <div class="camera-icon">📸</div>
+                <p data-en="Tap to take or upload photo" data-es="Toca para tomar o subir foto">${currentLanguage === 'es' ? 'Toca para tomar o subir foto' : 'Tap to take or upload photo'}</p>
+                <input type="file" id="photo-input" accept="image/*" capture="environment" onchange="handlePhotoSelect(event)">
+            `;
+            
+            updateSubmitButton();
+        }
+
+        // Update submit button state
+        function updateSubmitButton() {
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = !selectedMilestone || !selectedPhoto;
+        }
+
+        // Submit progress
+        async function submitProgress() {
+            if (!selectedMilestone || !selectedPhoto) return;
+
+            showLoading(true);
+            hideError();
+
+            try {
+                const payload = {
+                    job_id: jobId,
+                    milestone: selectedMilestone,
+                    photo_base64: selectedPhotoBase64,
+                    photo_filename: selectedPhoto.name,
+                    notes: document.getElementById('notes-input').value,
+                    timestamp: new Date().toISOString(),
+                    customer_name: jobData.customer_name,
+                    address: jobData.address,
+                    city: jobData.city,
+                    crew_id: jobData.crew_id,
+                    companycam_project_id: jobData.companycam_project_id || null
+                };
+
+                const response = await fetch(CONFIG.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error('Failed to submit');
+
+                // Show success
+                document.getElementById('form-container').style.display = 'none';
+                document.getElementById('success-container').style.display = 'block';
+
+                // Update local data to reflect the change
+                jobData['progress_' + selectedMilestone + '_time'] = new Date().toISOString();
+                updateProgressTrack();
+
+            } catch (error) {
+                console.error('Submit error:', error);
+                showError('Failed to submit. Please try again.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Reset form for another submission
+        function resetForm() {
+            selectedMilestone = null;
+            selectedPhoto = null;
+            selectedPhotoBase64 = null;
+
+            document.querySelectorAll('.milestone-btn').forEach(b => b.classList.remove('selected'));
+            removePhoto({ stopPropagation: () => {} });
+            document.getElementById('notes-input').value = '';
+
+            document.getElementById('form-container').style.display = 'block';
+            document.getElementById('success-container').style.display = 'none';
+
+            updateMilestoneButtons();
+            updateSubmitButton();
+        }
+
+        // Language toggle
+        function setLanguage(lang) {
+            currentLanguage = lang;
+            
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase().includes(lang === 'en' ? 'english' : 'español'));
+            });
+
+            document.querySelectorAll('[data-' + lang + ']').forEach(el => {
+                el.textContent = el.getAttribute('data-' + lang);
+            });
+
+            document.querySelectorAll('[data-' + lang + '-placeholder]').forEach(el => {
+                el.placeholder = el.getAttribute('data-' + lang + '-placeholder');
+            });
+        }
+
+        // Utilities
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('hidden', !show);
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('error-msg');
+            el.textContent = msg;
+            el.classList.add('show');
+        }
+
+        function hideError() {
+            document.getElementById('error-msg').classList.remove('show');
+        }
+    </script>
+</body>
+</html>
