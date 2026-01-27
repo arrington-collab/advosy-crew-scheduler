@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advosy Crew Scheduler - Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'DM Sans', sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); }
+        .glass-strong { background: rgba(255,255,255,0.06); backdrop-filter: blur(30px); }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .task-complete { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
+        .task-incomplete { background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); }
+        .glow-orange { box-shadow: 0 0 40px rgba(249, 115, 22, 0.15); }
+        .task-check {
+            appearance: none;
+            width: 28px;
+            height: 28px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+        }
+        .task-check:checked {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            border-color: #22c55e;
+        }
+        .task-check:checked::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .modal-backdrop { background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
+        .multi-day-badge {
+            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        .market-filter-btn {
+            background: rgba(255,255,255,0.05);
+            color: #94a3b8;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .market-filter-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #e2e8f0;
+        }
+        .market-filter-btn.active {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            color: white;
+            border-color: #f97316;
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
+    <div class="fixed inset-0 opacity-20 pointer-events-none">
+        <div class="absolute inset-0" style="background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0); background-size: 50px 50px;"></div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-state" class="fixed inset-0 flex items-center justify-center z-50 bg-slate-950">
+        <div class="text-center">
+            <div class="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p class="text-slate-400">Loading dashboard...</p>
+        </div>
+    </div>
+
+    <div class="relative min-h-screen flex flex-col p-4 lg:p-6">
+        <!-- Header -->
+        <header class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl lg:text-3xl font-bold">Crew Scheduler</h1>
+                    <p class="text-slate-400 text-sm">Advosy Construction</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="https://banc-r.app.n8n.cloud/form/60f6830f-38d6-45d9-a0b2-9e8529fa2709" target="_blank" class="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shadow-lg shadow-green-500/20">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Job
+                </a>
+                <button onclick="location.reload()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-sm flex items-center gap-2 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Refresh
+                </button>
+                <div class="flex items-center gap-2 text-sm">
+                    <div id="status-indicator" class="w-2 h-2 rounded-full bg-yellow-400"></div>
+                    <span id="status-text" class="text-slate-400">Connecting...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Market Filter -->
+        <div class="flex items-center gap-2 mb-4 flex-wrap">
+            <span class="text-xs text-slate-500 mr-2">MARKET:</span>
+            <button onclick="setMarketFilter('all')" id="filter-all" class="market-filter-btn active px-4 py-2 rounded-xl text-sm font-semibold transition-all">
+                All Markets
+            </button>
+            <button onclick="setMarketFilter('Vegas')" id="filter-Vegas" class="market-filter-btn px-4 py-2 rounded-xl text-sm font-semibold transition-all">
+                🎰 Vegas
+            </button>
+            <button onclick="setMarketFilter('AZ Northwest')" id="filter-AZ Northwest" class="market-filter-btn px-4 py-2 rounded-xl text-sm font-semibold transition-all">
+                🏜️ AZ Northwest
+            </button>
+            <button onclick="setMarketFilter('The Valley')" id="filter-The Valley" class="market-filter-btn px-4 py-2 rounded-xl text-sm font-semibold transition-all">
+                🌵 The Valley
+            </button>
+            <button onclick="setMarketFilter('AZ South')" id="filter-AZ South" class="market-filter-btn px-4 py-2 rounded-xl text-sm font-semibold transition-all">
+                ☀️ AZ South
+            </button>
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div class="glass rounded-xl p-4 border border-blue-500/20">
+                <div class="text-xs text-slate-500 mb-1">Total Jobs</div>
+                <div class="text-2xl font-bold text-blue-400" id="stat-total-jobs">0</div>
+                <div class="text-xs text-slate-500 mt-1">scheduled</div>
+            </div>
+            <div class="glass rounded-xl p-4 border border-orange-500/20">
+                <div class="text-xs text-slate-500 mb-1">Total Squares</div>
+                <div class="text-2xl font-bold text-orange-400" id="stat-total-squares">0</div>
+                <div class="text-xs text-slate-500 mt-1">SQ</div>
+            </div>
+            <div class="glass rounded-xl p-4 border border-green-500/20">
+                <div class="text-xs text-slate-500 mb-1">Crew Pay</div>
+                <div class="text-2xl font-bold text-green-400" id="stat-total-pay">$0</div>
+                <div class="text-xs text-slate-500 mt-1">scheduled</div>
+            </div>
+            <div class="glass rounded-xl p-4 border border-red-500/20">
+                <div class="text-xs text-slate-500 mb-1">Pending Accept</div>
+                <div class="text-2xl font-bold text-red-400" id="stat-pending-accept">0</div>
+                <div class="text-xs text-slate-500 mt-1">jobs</div>
+            </div>
+        </div>
+
+        <!-- Crew Dashboard Links -->
+        <div class="glass rounded-xl p-4 border border-white/10 mb-4">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-semibold text-slate-400">👷 CREW DASHBOARDS</h3>
+            </div>
+            <div id="crew-links" class="flex flex-wrap gap-2">
+                <span class="text-slate-500 text-sm">Loading crews...</span>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col gap-4">
+            <!-- Crew Has Not Accepted 24+ hours -->
+            <div id="not-accepted-section" class="glass rounded-2xl border border-red-600/40 p-5 hidden" style="background: rgba(220, 38, 38, 0.1);">
+                <h2 class="text-sm font-semibold text-red-500 mb-4">🚨 CREW HAS NOT ACCEPTED - 24+ HOURS (<span id="not-accepted-count">0</span>)</h2>
+                <p class="text-xs text-red-400/70 mb-3">These jobs were assigned over 24 hours ago but crew hasn't accepted yet</p>
+                <div id="not-accepted-jobs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                </div>
+            </div>
+
+            <!-- Needs Attention -->
+            <div class="glass rounded-2xl border border-red-500/20 p-5">
+                <h2 class="text-sm font-semibold text-red-400 mb-4">⚠️ NEEDS ATTENTION (<span id="attention-count">0</span>)</h2>
+                <div id="attention-jobs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div class="text-slate-500 text-sm">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Today's Jobs -->
+            <div class="glass rounded-2xl border border-orange-500/20 p-5 glow-orange">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-orange-400">☀️ TODAY'S JOBS (<span id="today-count">0</span>)</h2>
+                    <span class="text-xs text-slate-500" id="today-date">--</span>
+                </div>
+                <div id="today-jobs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div class="text-slate-500 text-sm">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Upcoming Schedule -->
+            <div class="flex-1 glass rounded-2xl border border-white/10 p-5 overflow-hidden flex flex-col">
+                <h2 class="text-sm font-semibold text-slate-400 mb-4">📅 UPCOMING SCHEDULE (<span id="upcoming-count">0</span>)</h2>
+                <div id="upcoming-jobs" class="flex-1 overflow-y-auto scrollbar-hide grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div class="text-slate-500 text-sm">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Update Modal -->
+    <div id="task-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 modal-backdrop" onclick="closeTaskModal()"></div>
+        <div class="relative bg-slate-800 rounded-2xl border border-white/10 p-6 w-full max-w-md">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold">Update Tasks</h3>
+                <button onclick="closeTaskModal()" class="text-slate-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <p class="text-slate-400 mb-4" id="modal-job-name">Job Name</p>
+            <div class="space-y-3 mb-6">
+                <label class="flex items-center gap-3 p-3 rounded-xl bg-white/5 cursor-pointer hover:bg-white/10">
+                    <input type="checkbox" id="task-mo" class="task-check">
+                    <span><strong>MO</strong> - Material Ordered</span>
+                </label>
+                <label class="flex items-center gap-3 p-3 rounded-xl bg-white/5 cursor-pointer hover:bg-white/10">
+                    <input type="checkbox" id="task-ho" class="task-check">
+                    <span><strong>HO</strong> - Homeowner Notified</span>
+                </label>
+                <label class="flex items-center gap-3 p-3 rounded-xl bg-white/5 cursor-pointer hover:bg-white/10">
+                    <input type="checkbox" id="task-md" class="task-check">
+                    <span><strong>MD</strong> - Material Delivered</span>
+                </label>
+                <label class="flex items-center gap-3 p-3 rounded-xl bg-white/5 cursor-pointer hover:bg-white/10">
+                    <input type="checkbox" id="task-sa" class="task-check">
+                    <span><strong>SA</strong> - Sub Accepted</span>
+                </label>
+                <label class="flex items-center gap-3 p-3 rounded-xl bg-white/5 cursor-pointer hover:bg-white/10">
+                    <input type="checkbox" id="task-wo" class="task-check">
+                    <span><strong>WO</strong> - Work Order Sent</span>
+                </label>
+            </div>
+            <button onclick="saveTaskUpdates()" class="w-full py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 rounded-xl font-semibold transition-all">
+                Save Changes
+            </button>
+        </div>
+    </div>
+
+    <!-- Success Toast -->
+    <div id="success-toast" class="fixed bottom-6 right-6 bg-green-500 text-white px-6 py-3 rounded-xl font-semibold hidden z-50">
+        ✓ Tasks updated
+    </div>
+
+    <script>
+        const CONFIG = {
+            dashboardApiUrl: 'https://banc-r.app.n8n.cloud/webhook/dashboard-data',
+            taskUpdateUrl: 'https://banc-r.app.n8n.cloud/webhook/update-task',
+            tasksSheetUrl: 'https://docs.google.com/spreadsheets/d/1msoAfjZr2C8_PcpHL7hn4qv2rzgVPF4EsjAhPaIlcb8/gviz/tq?tqx=out:json&sheet=Job_Tasks',
+            crewsSheetUrl: 'https://docs.google.com/spreadsheets/d/1msoAfjZr2C8_PcpHL7hn4qv2rzgVPF4EsjAhPaIlcb8/gviz/tq?tqx=out:json&sheet=Crews',
+            refreshInterval: 5 * 60 * 1000
+        };
+
+        let dashboardData = null;
+        let tasksData = {};
+        let crewsData = {};
+        let currentJobId = null;
+        let currentJobGroupId = null;
+        let currentMarketFilter = 'all';
+        let rawDashboardData = null;
+
+        function setMarketFilter(market) {
+            currentMarketFilter = market;
+            
+            // Update button states
+            document.querySelectorAll('.market-filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            const btnId = market === 'all' ? 'filter-all' : 'filter-' + market;
+            const activeBtn = document.getElementById(btnId);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+            
+            // Re-render with filter
+            if (rawDashboardData) {
+                applyMarketFilter();
+            }
+        }
+
+        function applyMarketFilter() {
+            if (!rawDashboardData) return;
+            
+            // Deep clone the raw data
+            dashboardData = JSON.parse(JSON.stringify(rawDashboardData));
+            
+            if (currentMarketFilter !== 'all' && dashboardData.schedule) {
+                ['today', 'upcoming', 'needs_attention'].forEach(key => {
+                    if (dashboardData.schedule[key]) {
+                        dashboardData.schedule[key] = dashboardData.schedule[key].filter(job => 
+                            job.market === currentMarketFilter
+                        );
+                    }
+                });
+            }
+            
+            // Group multi-day jobs after filtering
+            if (dashboardData.schedule) {
+                dashboardData.schedule.today = groupMultiDayJobs(dashboardData.schedule.today || []);
+                dashboardData.schedule.upcoming = groupMultiDayJobs(dashboardData.schedule.upcoming || []);
+                
+                // Recalculate needs_attention
+                const now = new Date();
+                const twoDaysFromNow = new Date(now);
+                twoDaysFromNow.setDate(twoDaysFromNow.getDate() + 2);
+                
+                const allUpcoming = dashboardData.schedule.upcoming.flatMap(group => group.days || [group]);
+                const needsAttention = allUpcoming.filter(job => {
+                    const scheduledDate = new Date(job.scheduled_date + 'T00:00:00');
+                    return scheduledDate <= twoDaysFromNow && !job.all_tasks_complete;
+                });
+                dashboardData.schedule.needs_attention = groupMultiDayJobs(needsAttention);
+            }
+            
+            renderDashboard(dashboardData);
+        }
+
+        // Fetch tasks directly from Google Sheets
+        async function loadTasks() {
+            try {
+                const response = await fetch(CONFIG.tasksSheetUrl);
+                const text = await response.text();
+                const jsonString = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/)[1];
+                const data = JSON.parse(jsonString);
+                const rows = data.table.rows;
+                const cols = data.table.cols.map(c => c.label);
+
+                tasksData = {};
+                for (const row of rows) {
+                    const rowData = {};
+                    row.c.forEach((cell, i) => {
+                        rowData[cols[i]] = cell ? cell.v : null;
+                    });
+                    if (rowData.job_id) {
+                        tasksData[rowData.job_id] = rowData;
+                    }
+                }
+                console.log('Tasks loaded:', Object.keys(tasksData).length);
+            } catch (error) {
+                console.error('Failed to load tasks from sheet:', error);
+            }
+        }
+
+        // Fetch crews data for name lookup
+        async function loadCrews() {
+            try {
+                const response = await fetch(CONFIG.crewsSheetUrl);
+                const text = await response.text();
+                const jsonString = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/)[1];
+                const data = JSON.parse(jsonString);
+                const rows = data.table.rows;
+                const cols = data.table.cols.map(c => c.label);
+
+                for (const row of rows) {
+                    const rowData = {};
+                    row.c.forEach((cell, i) => {
+                        rowData[cols[i]] = cell ? cell.v : null;
+                    });
+                    if (rowData.crew_id && rowData.crew_name) {
+                        crewsData[rowData.crew_id] = rowData.crew_name;
+                    }
+                }
+                console.log('Crews loaded:', Object.keys(crewsData).length);
+            } catch (error) {
+                console.error('Failed to load crews:', error);
+            }
+        }
+
+        // Get crew name from ID
+        function getCrewName(crewId) {
+            return crewsData[crewId] || crewId;
+        }
+
+        // Group jobs by job_group_id for multi-day jobs
+        function groupMultiDayJobs(jobs) {
+            const grouped = {};
+            
+            for (const job of jobs) {
+                const groupId = job.job_group_id || job.job_id;
+                
+                if (!grouped[groupId]) {
+                    grouped[groupId] = {
+                        ...job,
+                        days: [job],
+                        start_date: job.scheduled_date,
+                        end_date: job.scheduled_date,
+                        total_days: job.total_days || 1,
+                        all_job_ids: [job.job_id]
+                    };
+                } else {
+                    grouped[groupId].days.push(job);
+                    grouped[groupId].all_job_ids.push(job.job_id);
+                    
+                    // Update date range
+                    if (job.scheduled_date < grouped[groupId].start_date) {
+                        grouped[groupId].start_date = job.scheduled_date;
+                    }
+                    if (job.scheduled_date > grouped[groupId].end_date) {
+                        grouped[groupId].end_date = job.scheduled_date;
+                    }
+                }
+            }
+            
+            // Convert to array and sort by start_date
+            return Object.values(grouped).sort((a, b) => 
+                new Date(a.start_date) - new Date(b.start_date)
+            );
+        }
+
+        async function loadDashboard() {
+            try {
+                await loadTasks();
+                await loadCrews();
+                
+                const response = await fetch(CONFIG.dashboardApiUrl);
+                if (!response.ok) throw new Error('API error');
+
+                let jsonData = await response.json();
+                let data = Array.isArray(jsonData) ? jsonData[0] : jsonData;
+
+                // Merge tasks data into jobs
+                if (data.schedule) {
+                    ['today', 'upcoming', 'needs_attention'].forEach(key => {
+                        if (data.schedule[key]) {
+                            data.schedule[key] = data.schedule[key].map(job => {
+                                const tasks = tasksData[job.job_id] || {};
+                                const taskStatus = {
+                                    material_ordered: tasks.material_ordered === true || tasks.material_ordered === 'TRUE',
+                                    ho_notified: tasks.ho_notified === true || tasks.ho_notified === 'TRUE',
+                                    material_delivered: tasks.material_delivered === true || tasks.material_delivered === 'TRUE',
+                                    sub_accepted: tasks.sub_accepted === true || tasks.sub_accepted === 'TRUE',
+                                    work_order_sent: tasks.work_order_sent === true || tasks.work_order_sent === 'TRUE'
+                                };
+                                const completedTasks = Object.values(taskStatus).filter(v => v).length;
+
+                                return {
+                                    ...job,
+                                    tasks: taskStatus,
+                                    task_progress: completedTasks + '/5',
+                                    all_tasks_complete: completedTasks === 5
+                                };
+                            });
+                        }
+                    });
+                }
+
+                // Store raw data before grouping (for market filter)
+                rawDashboardData = JSON.parse(JSON.stringify(data));
+                
+                // Apply current market filter
+                applyMarketFilter();
+
+                document.getElementById('status-indicator').className = 'w-2 h-2 rounded-full bg-green-400 animate-pulse';
+                document.getElementById('status-text').textContent = 'Live';
+
+            } catch (error) {
+                console.error('Failed to load dashboard:', error);
+                document.getElementById('status-indicator').className = 'w-2 h-2 rounded-full bg-red-400';
+                document.getElementById('status-text').textContent = 'Offline';
+                document.getElementById('attention-jobs').innerHTML = '<div class="text-red-400 text-sm">Failed to load data.</div>';
+                document.getElementById('today-jobs').innerHTML = '<div class="text-red-400 text-sm">Failed to load data.</div>';
+                document.getElementById('upcoming-jobs').innerHTML = '<div class="text-red-400 text-sm">Failed to load data.</div>';
+            } finally {
+                document.getElementById('loading-state').classList.add('hidden');
+            }
+        }
+
+        function renderDashboard(data) {
+            document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', {
+                weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+            });
+
+            // Get all jobs for stats calculation
+            const todayJobs = data.schedule?.today || [];
+            const upcomingJobs = data.schedule?.upcoming || [];
+            const allJobs = [...todayJobs, ...upcomingJobs];
+
+            // Calculate summary stats
+            let totalSquares = 0;
+            let totalPay = 0;
+            let pendingAccept = 0;
+            let notAccepted24hrs = [];
+
+            const now = new Date();
+            
+            allJobs.forEach(job => {
+                totalSquares += parseFloat(job.squares) || 0;
+                totalPay += parseFloat(job.crew_total_pay) || 0;
+                
+                // Check if sub has accepted
+                const tasks = job.tasks || (job.days && job.days[0]?.tasks) || {};
+                const isAccepted = tasks.sub_accepted === true || tasks.sub_accepted === 'TRUE' || tasks.sub_accepted === 'true';
+                
+                if (!isAccepted) {
+                    pendingAccept++;
+                    
+                    // Check if created over 24 hours ago
+                    if (job.created_date) {
+                        const createdDate = new Date(job.created_date);
+                        const hoursSinceCreated = (now - createdDate) / (1000 * 60 * 60);
+                        if (hoursSinceCreated >= 24) {
+                            notAccepted24hrs.push(job);
+                        }
+                    }
+                }
+            });
+
+            // Update stats display
+            document.getElementById('stat-total-jobs').textContent = allJobs.length;
+            document.getElementById('stat-total-squares').textContent = Math.round(totalSquares).toLocaleString();
+            document.getElementById('stat-total-pay').textContent = '$' + Math.round(totalPay).toLocaleString();
+            document.getElementById('stat-pending-accept').textContent = pendingAccept;
+
+            // Render crew dashboard links
+            const crewLinksHtml = Object.entries(crewsData).map(([id, name]) => {
+                return '<a href="https://arrington-collab.github.io/advosy-crew-scheduler/crew-dashboard.html?crew=' + id + '" target="_blank" ' +
+                    'class="px-3 py-2 bg-slate-700/50 hover:bg-slate-600/50 border border-slate-600/50 rounded-lg text-sm font-medium text-slate-300 hover:text-white transition-colors flex items-center gap-2">' +
+                    '<span class="w-2 h-2 rounded-full bg-green-400"></span>' + name + 
+                '</a>';
+            }).join('');
+            document.getElementById('crew-links').innerHTML = crewLinksHtml || '<span class="text-slate-500 text-sm">No crews found</span>';
+
+            // Render "Not Accepted 24+ hours" section
+            if (notAccepted24hrs.length > 0) {
+                document.getElementById('not-accepted-section').classList.remove('hidden');
+                document.getElementById('not-accepted-count').textContent = notAccepted24hrs.length;
+                document.getElementById('not-accepted-jobs').innerHTML = notAccepted24hrs.map(job => renderJobCard(job, true)).join('');
+            } else {
+                document.getElementById('not-accepted-section').classList.add('hidden');
+            }
+
+            // Render attention jobs
+            const attentionJobs = data.schedule?.needs_attention || [];
+            document.getElementById('attention-count').textContent = attentionJobs.length;
+            if (attentionJobs.length > 0) {
+                document.getElementById('attention-jobs').innerHTML = attentionJobs.map(job => renderJobCard(job, true)).join('');
+            } else {
+                document.getElementById('attention-jobs').innerHTML = '<div class="text-green-400 text-sm col-span-full">✓ All jobs are on track!</div>';
+            }
+
+            // Render today's jobs
+            document.getElementById('today-count').textContent = todayJobs.length;
+            if (todayJobs.length > 0) {
+                document.getElementById('today-jobs').innerHTML = todayJobs.map(job => renderJobCard(job, false)).join('');
+            } else {
+                document.getElementById('today-jobs').innerHTML = '<div class="text-slate-500 text-sm col-span-full">No jobs scheduled for today</div>';
+            }
+
+            // Render upcoming jobs
+            document.getElementById('upcoming-count').textContent = upcomingJobs.length;
+            if (upcomingJobs.length > 0) {
+                document.getElementById('upcoming-jobs').innerHTML = upcomingJobs.map(job => renderJobCard(job, false)).join('');
+            } else {
+                document.getElementById('upcoming-jobs').innerHTML = '<div class="text-slate-500 text-sm col-span-full">No upcoming jobs scheduled</div>';
+            }
+        }
+
+        function renderJobCard(job, urgent) {
+            const tasks = job.tasks || (job.days && job.days[0]?.tasks) || {};
+            const isMultiDay = job.total_days > 1 || (job.days && job.days.length > 1);
+            const totalDays = job.total_days || (job.days ? job.days.length : 1);
+            
+            const startDate = new Date(job.start_date + 'T00:00:00');
+            const endDate = new Date(job.end_date + 'T00:00:00');
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            const daysUntil = Math.ceil((startDate - today) / (1000 * 60 * 60 * 24));
+
+            let dateLabel = '';
+            if (daysUntil === 0) dateLabel = 'Today';
+            else if (daysUntil === 1) dateLabel = 'Tomorrow';
+            else if (daysUntil < 0) dateLabel = Math.abs(daysUntil) + ' days ago';
+            else dateLabel = daysUntil + ' days away';
+
+            // Format date display
+            let dateFormatted;
+            if (isMultiDay) {
+                const startFormatted = startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                const endFormatted = endDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                dateFormatted = startFormatted + ' - ' + endFormatted;
+            } else {
+                dateFormatted = startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            }
+
+            const taskBadges = ['MO', 'HO', 'MD', 'SA', 'WO'].map(t => {
+                const key = t === 'MO' ? 'material_ordered' :
+                            t === 'HO' ? 'ho_notified' :
+                            t === 'MD' ? 'material_delivered' :
+                            t === 'SA' ? 'sub_accepted' : 'work_order_sent';
+                const done = tasks[key] === true || tasks[key] === 'TRUE';
+                return '<span class="px-2 py-0.5 rounded text-xs font-bold ' + 
+                       (done ? 'task-complete text-white' : 'task-incomplete text-red-400') + 
+                       '">' + t + '</span>';
+            }).join('');
+
+            const tasksJson = JSON.stringify(tasks).replace(/"/g, '&quot;');
+            const jobId = job.job_id || (job.days && job.days[0]?.job_id) || '';
+            const jobGroupId = job.job_group_id || jobId;
+            const allJobIds = job.all_job_ids ? JSON.stringify(job.all_job_ids).replace(/"/g, '&quot;') : '["' + jobId + '"]';
+            
+            const multiDayBadge = isMultiDay ? 
+                '<span class="multi-day-badge ml-2">' + totalDays + ' days</span>' : '';
+
+            // Pay breakdown
+            const crewTotalPay = parseFloat(job.crew_total_pay) || 0;
+            const crewBasePay = parseFloat(job.crew_base_pay) || 0;
+            const additionalPayTotal = parseFloat(job.additional_pay_total) || 0;
+            const crewPayRate = parseFloat(job.crew_pay_rate) || 0;
+            
+            let paySection = '';
+            if (crewTotalPay > 0) {
+                let payBreakdown = 'Base: $' + crewBasePay.toLocaleString();
+                if (additionalPayTotal > 0) {
+                    // Parse additional items
+                    let extrasDetail = '';
+                    if (job.additional_pay_items && job.additional_pay_items.trim() !== '') {
+                        const items = job.additional_pay_items.split(',').map(item => {
+                            const parts = item.split(':');
+                            return parts[0] + ': $' + (parseFloat(parts[1]) || 0);
+                        });
+                        extrasDetail = ' (' + items.join(', ') + ')';
+                    }
+                    payBreakdown += ' + Extras: $' + additionalPayTotal.toLocaleString() + extrasDetail;
+                }
+                paySection = '<div class="mt-2 p-2 bg-green-500/10 border border-green-500/20 rounded-lg">' +
+                    '<div class="flex justify-between items-center">' +
+                        '<span class="text-green-400 text-xs font-semibold">💰 Crew Pay</span>' +
+                        '<span class="text-green-400 font-bold">$' + crewTotalPay.toLocaleString() + '</span>' +
+                    '</div>' +
+                    '<div class="text-xs text-slate-400 mt-1">' + payBreakdown + '</div>' +
+                '</div>';
+            }
+
+            // Job notes section
+            let notesSection = '';
+            if (job.job_notes && job.job_notes.trim() !== '') {
+                notesSection = '<div class="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">' +
+                    '<span class="text-amber-400 text-xs">📝 ' + job.job_notes + '</span>' +
+                '</div>';
+            }
+
+            // EspoCRM link
+            let espoLink = '';
+            if (job.espocrm_link && job.espocrm_link.trim() !== '') {
+                espoLink = '<a href="' + job.espocrm_link + '" target="_blank" class="px-2 py-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded text-xs font-semibold transition-colors">CRM</a>';
+            }
+
+            return '<div class="bg-white/5 rounded-xl p-4 border ' + 
+                   (urgent ? 'border-red-500/30' : 'border-white/5') + 
+                   ' hover:bg-white/10 transition-colors">' +
+                '<div class="flex justify-between items-start mb-2">' +
+                    '<div>' +
+                        '<h3 class="font-semibold text-white flex items-center">' + job.customer_name + multiDayBadge + '</h3>' +
+                        '<p class="text-slate-400 text-sm">' + job.address + ', ' + job.city + '</p>' +
+                    '</div>' +
+                    '<div class="text-right">' +
+                        '<span class="mono text-orange-400 font-bold">' + job.squares + '</span>' +
+                        '<span class="text-slate-500 text-xs"> SQ</span>' +
+                    '</div>' +
+                '</div>' +
+                '<p class="text-xs ' + (urgent ? 'text-red-400' : 'text-blue-400') + ' mb-2">' + 
+                    dateFormatted + ' • ' + dateLabel + '</p>' +
+                '<p class="text-xs text-slate-500 mb-2">' + (job.shingle_line || '') + ' - ' + (job.shingle_color || '') + '</p>' +
+                notesSection +
+                paySection +
+                '<div class="flex items-center justify-between mt-3">' +
+                    '<div class="flex gap-1">' + taskBadges + '</div>' +
+                    '<div class="flex gap-2">' +
+                        espoLink +
+                        '<button onclick=\'openTaskModal("' + jobId + '", "' + jobGroupId + '", "' + job.customer_name + '", ' + tasksJson + ', ' + allJobIds + ')\' class="px-3 py-1 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg text-xs font-semibold transition-colors">Update Tasks</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="mt-2 text-right"><span class="text-xs text-slate-500">' + getCrewName(job.crew_id || '') + '</span></div>' +
+            '</div>';
+        }
+
+        function openTaskModal(jobId, jobGroupId, jobName, tasks, allJobIds) {
+            currentJobId = jobId;
+            currentJobGroupId = jobGroupId;
+            currentAllJobIds = allJobIds || [jobId];
+            
+            document.getElementById('modal-job-name').textContent = jobName;
+            document.getElementById('task-mo').checked = tasks.material_ordered === true || tasks.material_ordered === 'TRUE';
+            document.getElementById('task-ho').checked = tasks.ho_notified === true || tasks.ho_notified === 'TRUE';
+            document.getElementById('task-md').checked = tasks.material_delivered === true || tasks.material_delivered === 'TRUE';
+            document.getElementById('task-sa').checked = tasks.sub_accepted === true || tasks.sub_accepted === 'TRUE';
+            document.getElementById('task-wo').checked = tasks.work_order_sent === true || tasks.work_order_sent === 'TRUE';
+
+            document.getElementById('task-modal').classList.remove('hidden');
+            document.getElementById('task-modal').classList.add('flex');
+        }
+
+        function closeTaskModal() {
+            document.getElementById('task-modal').classList.add('hidden');
+            document.getElementById('task-modal').classList.remove('flex');
+            currentJobId = null;
+            currentJobGroupId = null;
+            currentAllJobIds = null;
+        }
+
+        async function saveTaskUpdates() {
+            if (!currentJobId) return;
+
+            const updates = {
+                job_id: currentJobId,
+                job_group_id: currentJobGroupId,
+                all_job_ids: currentAllJobIds,
+                material_ordered: document.getElementById('task-mo').checked,
+                ho_notified: document.getElementById('task-ho').checked,
+                material_delivered: document.getElementById('task-md').checked,
+                sub_accepted: document.getElementById('task-sa').checked,
+                work_order_sent: document.getElementById('task-wo').checked
+            };
+
+            try {
+                const response = await fetch(CONFIG.taskUpdateUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updates)
+                });
+
+                if (response.ok) {
+                    const toast = document.getElementById('success-toast');
+                    toast.classList.remove('hidden');
+                    setTimeout(() => toast.classList.add('hidden'), 3000);
+                    closeTaskModal();
+                    setTimeout(() => loadDashboard(), 1000);
+                }
+            } catch (error) {
+                console.error('Failed to update tasks:', error);
+                alert('Failed to update tasks. Please try again.');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDashboard();
+            setInterval(loadDashboard, CONFIG.refreshInterval);
+        });
+    </script>
+</body>
+</html>
