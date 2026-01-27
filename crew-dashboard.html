@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crew Schedule - Advosy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'DM Sans', sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .task-complete { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
+        .task-incomplete { background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); }
+        .glow-orange { box-shadow: 0 0 40px rgba(249, 115, 22, 0.15); }
+        .multi-day-badge {
+            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        .job-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.2s;
+        }
+        .job-card:hover {
+            background: rgba(255,255,255,0.08);
+            transform: translateY(-2px);
+        }
+        .today-card {
+            border-color: rgba(249, 115, 22, 0.4);
+            box-shadow: 0 0 30px rgba(249, 115, 22, 0.1);
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
+    <div class="fixed inset-0 opacity-20 pointer-events-none">
+        <div class="absolute inset-0" style="background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0); background-size: 50px 50px;"></div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-state" class="fixed inset-0 flex items-center justify-center z-50 bg-slate-950">
+        <div class="text-center">
+            <div class="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p class="text-slate-400">Loading your schedule...</p>
+        </div>
+    </div>
+
+    <!-- No Crew Error -->
+    <div id="no-crew-error" class="fixed inset-0 flex items-center justify-center z-50 bg-slate-950 hidden">
+        <div class="text-center p-8">
+            <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <h2 class="text-xl font-bold text-white mb-2">No Crew Specified</h2>
+            <p class="text-slate-400 mb-4">Please use your crew-specific link to access your schedule.</p>
+            <p class="text-slate-500 text-sm">Contact your Project Coordinator if you need assistance.</p>
+        </div>
+    </div>
+
+    <div id="main-content" class="relative min-h-screen flex flex-col p-4 lg:p-6 hidden">
+        <!-- Header -->
+        <header class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl lg:text-3xl font-bold" id="crew-name">My Schedule</h1>
+                    <p class="text-slate-400 text-sm">Advosy Construction</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="location.reload()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-sm flex items-center gap-2 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Refresh
+                </button>
+                <span class="text-xs text-slate-500" id="current-date"></span>
+            </div>
+        </header>
+
+        <!-- Stats Bar -->
+        <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="glass rounded-xl p-4 text-center border border-orange-500/20">
+                <div class="text-3xl font-bold text-orange-400" id="stat-today">0</div>
+                <div class="text-xs text-slate-400 mt-1">Today</div>
+            </div>
+            <div class="glass rounded-xl p-4 text-center border border-blue-500/20">
+                <div class="text-3xl font-bold text-blue-400" id="stat-week">0</div>
+                <div class="text-xs text-slate-400 mt-1">This Week</div>
+            </div>
+            <div class="glass rounded-xl p-4 text-center border border-purple-500/20">
+                <div class="text-3xl font-bold text-purple-400" id="stat-total">0</div>
+                <div class="text-xs text-slate-400 mt-1">Total Upcoming</div>
+            </div>
+        </div>
+
+        <!-- Today's Jobs -->
+        <div class="glass rounded-2xl border border-orange-500/20 p-5 glow-orange mb-4">
+            <h2 class="text-lg font-bold text-orange-400 mb-4 flex items-center gap-2">
+                <span class="text-2xl">☀️</span> Today's Jobs
+            </h2>
+            <div id="today-jobs" class="space-y-3">
+                <div class="text-slate-500 text-sm">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Upcoming Schedule -->
+        <div class="flex-1 glass rounded-2xl border border-white/10 p-5 overflow-hidden flex flex-col">
+            <h2 class="text-lg font-bold text-slate-300 mb-4 flex items-center gap-2">
+                <span class="text-2xl">📅</span> Upcoming Schedule
+            </h2>
+            <div id="upcoming-jobs" class="flex-1 overflow-y-auto scrollbar-hide space-y-3">
+                <div class="text-slate-500 text-sm">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Contact Section -->
+        <div class="mt-4 glass rounded-xl border border-white/10 p-4">
+            <p class="text-center text-slate-400 text-sm">
+                Questions? Contact your Project Coordinator: 
+                <span id="pc-contact" class="text-orange-400 font-semibold">--</span>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = {
+            dashboardApiUrl: 'https://banc-r.app.n8n.cloud/webhook/dashboard-data',
+            tasksSheetUrl: 'https://docs.google.com/spreadsheets/d/1msoAfjZr2C8_PcpHL7hn4qv2rzgVPF4EsjAhPaIlcb8/gviz/tq?tqx=out:json&sheet=Job_Tasks',
+            refreshInterval: 5 * 60 * 1000
+        };
+
+        let crewId = null;
+        let crewName = null;
+        let tasksData = {};
+
+        // Get crew ID from URL
+        function getCrewFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('crew');
+        }
+
+        // Fetch tasks from Google Sheets
+        async function loadTasks() {
+            try {
+                const response = await fetch(CONFIG.tasksSheetUrl);
+                const text = await response.text();
+                const jsonString = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/)[1];
+                const data = JSON.parse(jsonString);
+                const rows = data.table.rows;
+                const cols = data.table.cols.map(c => c.label);
+
+                tasksData = {};
+                for (const row of rows) {
+                    const rowData = {};
+                    row.c.forEach((cell, i) => {
+                        rowData[cols[i]] = cell ? cell.v : null;
+                    });
+                    if (rowData.job_id) {
+                        tasksData[rowData.job_id] = rowData;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load tasks:', error);
+            }
+        }
+
+        // Group multi-day jobs
+        function groupMultiDayJobs(jobs) {
+            const grouped = {};
+            
+            for (const job of jobs) {
+                const groupId = job.job_group_id || job.job_id;
+                
+                if (!grouped[groupId]) {
+                    grouped[groupId] = {
+                        ...job,
+                        days: [job],
+                        start_date: job.scheduled_date,
+                        end_date: job.scheduled_date,
+                        total_days: job.total_days || 1
+                    };
+                } else {
+                    grouped[groupId].days.push(job);
+                    if (job.scheduled_date < grouped[groupId].start_date) {
+                        grouped[groupId].start_date = job.scheduled_date;
+                    }
+                    if (job.scheduled_date > grouped[groupId].end_date) {
+                        grouped[groupId].end_date = job.scheduled_date;
+                    }
+                }
+            }
+            
+            return Object.values(grouped).sort((a, b) => 
+                new Date(a.start_date) - new Date(b.start_date)
+            );
+        }
+
+        async function loadDashboard() {
+            try {
+                await loadTasks();
+                
+                const response = await fetch(CONFIG.dashboardApiUrl);
+                if (!response.ok) throw new Error('API error');
+
+                let jsonData = await response.json();
+                let data = Array.isArray(jsonData) ? jsonData[0] : jsonData;
+
+                // Get crew name from crews data
+                if (data.crews) {
+                    const crew = data.crews.find(c => c.crew_id === crewId);
+                    if (crew) {
+                        crewName = crew.crew_name;
+                        document.getElementById('crew-name').textContent = crewName + "'s Schedule";
+                    }
+                }
+
+                // Filter jobs for this crew only
+                let todayJobs = [];
+                let upcomingJobs = [];
+
+                if (data.schedule) {
+                    // Filter and add tasks to today's jobs
+                    if (data.schedule.today) {
+                        todayJobs = data.schedule.today
+                            .filter(job => job.crew_id === crewId)
+                            .map(job => addTasksToJob(job));
+                    }
+                    
+                    // Filter and add tasks to upcoming jobs
+                    if (data.schedule.upcoming) {
+                        upcomingJobs = data.schedule.upcoming
+                            .filter(job => job.crew_id === crewId)
+                            .map(job => addTasksToJob(job));
+                    }
+                }
+
+                // Group multi-day jobs
+                todayJobs = groupMultiDayJobs(todayJobs);
+                upcomingJobs = groupMultiDayJobs(upcomingJobs);
+
+                // Calculate stats
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                const weekEnd = new Date(today);
+                weekEnd.setDate(weekEnd.getDate() + 7);
+
+                const thisWeekJobs = upcomingJobs.filter(job => {
+                    const jobDate = new Date(job.start_date + 'T00:00:00');
+                    return jobDate >= today && jobDate < weekEnd;
+                });
+
+                document.getElementById('stat-today').textContent = todayJobs.length;
+                document.getElementById('stat-week').textContent = thisWeekJobs.length;
+                document.getElementById('stat-total').textContent = upcomingJobs.length;
+
+                // Render jobs
+                renderJobs('today-jobs', todayJobs, true);
+                renderJobs('upcoming-jobs', upcomingJobs, false);
+
+                // Set PC contact (you can customize this)
+                document.getElementById('pc-contact').textContent = 'Emiliano Tortora 928-502-9594';
+
+            } catch (error) {
+                console.error('Failed to load dashboard:', error);
+                document.getElementById('today-jobs').innerHTML = '<div class="text-red-400">Failed to load schedule. Please refresh.</div>';
+                document.getElementById('upcoming-jobs').innerHTML = '<div class="text-red-400">Failed to load schedule. Please refresh.</div>';
+            } finally {
+                document.getElementById('loading-state').classList.add('hidden');
+            }
+        }
+
+        function addTasksToJob(job) {
+            const tasks = tasksData[job.job_id] || {};
+            const taskStatus = {
+                material_ordered: tasks.material_ordered === true || tasks.material_ordered === 'TRUE',
+                ho_notified: tasks.ho_notified === true || tasks.ho_notified === 'TRUE',
+                material_delivered: tasks.material_delivered === true || tasks.material_delivered === 'TRUE',
+                sub_accepted: tasks.sub_accepted === true || tasks.sub_accepted === 'TRUE',
+                work_order_sent: tasks.work_order_sent === true || tasks.work_order_sent === 'TRUE'
+            };
+            return { ...job, tasks: taskStatus };
+        }
+
+        function renderJobs(containerId, jobs, isToday) {
+            const container = document.getElementById(containerId);
+            
+            if (jobs.length === 0) {
+                container.innerHTML = '<div class="text-slate-500 text-sm text-center py-4">' + 
+                    (isToday ? 'No jobs scheduled for today' : 'No upcoming jobs scheduled') + 
+                    '</div>';
+                return;
+            }
+
+            container.innerHTML = jobs.map(job => renderJobCard(job, isToday)).join('');
+        }
+
+        function renderJobCard(job, isToday) {
+            const isMultiDay = job.total_days > 1 || (job.days && job.days.length > 1);
+            const totalDays = job.total_days || (job.days ? job.days.length : 1);
+            
+            const startDate = new Date(job.start_date + 'T00:00:00');
+            const endDate = new Date(job.end_date + 'T00:00:00');
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            const daysUntil = Math.ceil((startDate - today) / (1000 * 60 * 60 * 24));
+
+            let dateLabel = '';
+            if (daysUntil === 0) dateLabel = 'Today';
+            else if (daysUntil === 1) dateLabel = 'Tomorrow';
+            else dateLabel = daysUntil + ' days away';
+
+            // Format date display
+            let dateFormatted;
+            if (isMultiDay) {
+                const startFormatted = startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                const endFormatted = endDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                dateFormatted = startFormatted + ' - ' + endFormatted;
+            } else {
+                dateFormatted = startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+            }
+
+            const multiDayBadge = isMultiDay ? 
+                '<span class="multi-day-badge ml-2">' + totalDays + ' days</span>' : '';
+
+            // Task indicators (simplified for crew view)
+            const tasks = job.tasks || {};
+            const materialReady = tasks.material_delivered ? 
+                '<span class="text-green-400 text-xs">✓ Materials Delivered</span>' : 
+                '<span class="text-yellow-400 text-xs">⏳ Materials Pending</span>';
+
+            // Google Maps link
+            const mapsLink = 'https://www.google.com/maps/search/?api=1&query=' + 
+                encodeURIComponent(job.address + ', ' + job.city);
+
+            return `
+                <div class="job-card rounded-xl p-4 ${isToday ? 'today-card' : ''}">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h3 class="font-bold text-lg text-white flex items-center">
+                                ${job.customer_name}${multiDayBadge}
+                            </h3>
+                            <a href="${mapsLink}" target="_blank" class="text-slate-400 text-sm hover:text-orange-400 flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                                ${job.address}, ${job.city}
+                            </a>
+                        </div>
+                        <div class="text-right">
+                            <span class="mono text-2xl text-orange-400 font-bold">${job.squares}</span>
+                            <span class="text-slate-500 text-sm"> SQ</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="text-sm ${isToday ? 'text-orange-400 font-semibold' : 'text-blue-400'}">
+                            📅 ${dateFormatted}
+                            <span class="text-slate-500 ml-2">• ${dateLabel}</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/5 rounded-lg p-3 mb-3">
+                        <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                                <span class="text-slate-500">Shingle:</span>
+                                <span class="text-white ml-1">${job.shingle_color || '--'}</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500">Line:</span>
+                                <span class="text-white ml-1">${job.shingle_line || '--'}</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500">Type:</span>
+                                <span class="text-white ml-1">${job.job_type || '--'}</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500">Market:</span>
+                                <span class="text-white ml-1">${job.market || '--'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-end">
+                        ${materialReady}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            crewId = getCrewFromUrl();
+            
+            if (!crewId) {
+                document.getElementById('loading-state').classList.add('hidden');
+                document.getElementById('no-crew-error').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('main-content').classList.remove('hidden');
+            document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-US', {
+                weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+            });
+
+            loadDashboard();
+            setInterval(loadDashboard, CONFIG.refreshInterval);
+        });
+    </script>
+</body>
+</html>
