@@ -151,10 +151,10 @@
                 <div class="text-2xl font-bold text-green-400" id="stat-total-pay">$0</div>
                 <div class="text-xs text-slate-500 mt-1">scheduled</div>
             </div>
-            <div class="glass rounded-xl p-4 border border-red-500/20">
+            <div class="glass rounded-xl p-4 border border-red-500/20 cursor-pointer hover:bg-red-500/10 transition-colors" onclick="openPendingAcceptModal()">
                 <div class="text-xs text-slate-500 mb-1">Pending Accept</div>
                 <div class="text-2xl font-bold text-red-400" id="stat-pending-accept">0</div>
-                <div class="text-xs text-slate-500 mt-1">jobs</div>
+                <div class="text-xs text-red-400 mt-1">Click to view →</div>
             </div>
         </div>
 
@@ -389,6 +389,25 @@
         </div>
     </div>
 
+    <!-- Pending Accept Modal -->
+    <div id="pending-accept-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 modal-backdrop" onclick="closePendingAcceptModal()"></div>
+        <div class="relative bg-slate-800 rounded-2xl border border-white/10 p-6 w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-red-400">🚨 Pending Accept (<span id="pending-modal-count">0</span>)</h3>
+                <button onclick="closePendingAcceptModal()" class="text-slate-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <p class="text-slate-400 text-sm mb-4">Jobs where the crew has not yet accepted the assignment</p>
+            <div id="pending-accept-list" class="flex-1 overflow-y-auto space-y-2">
+                <div class="text-slate-500 text-sm">Loading...</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Success Toast -->
     <div id="success-toast" class="fixed bottom-6 right-6 bg-green-500 text-white px-6 py-3 rounded-xl font-semibold hidden z-50">
         ✓ Tasks updated
@@ -411,6 +430,71 @@
         let currentJobGroupId = null;
         let currentMarketFilter = 'all';
         let rawDashboardData = null;
+        let pendingAcceptJobs = [];
+
+        // Pending Accept Modal functions
+        function openPendingAcceptModal() {
+            document.getElementById('pending-modal-count').textContent = pendingAcceptJobs.length;
+            
+            if (pendingAcceptJobs.length > 0) {
+                document.getElementById('pending-accept-list').innerHTML = pendingAcceptJobs.map(job => renderPendingAcceptItem(job)).join('');
+            } else {
+                document.getElementById('pending-accept-list').innerHTML = '<div class="text-green-400 text-sm">✓ All jobs have been accepted!</div>';
+            }
+            
+            document.getElementById('pending-accept-modal').classList.remove('hidden');
+            document.getElementById('pending-accept-modal').classList.add('flex');
+        }
+
+        function closePendingAcceptModal() {
+            document.getElementById('pending-accept-modal').classList.add('hidden');
+            document.getElementById('pending-accept-modal').classList.remove('flex');
+        }
+
+        function renderPendingAcceptItem(job) {
+            const jobId = job.job_id || (job.days && job.days[0]?.job_id) || '';
+            const tasks = job.tasks || (job.days && job.days[0]?.tasks) || {};
+            
+            // Format date
+            const scheduledDate = new Date(job.scheduled_date + 'T00:00:00');
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const daysUntil = Math.ceil((scheduledDate - today) / (1000 * 60 * 60 * 24));
+            let dateLabel = '';
+            if (daysUntil === 0) dateLabel = 'Today';
+            else if (daysUntil === 1) dateLabel = 'Tomorrow';
+            else if (daysUntil < 0) dateLabel = Math.abs(daysUntil) + ' days ago';
+            else dateLabel = scheduledDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            
+            // Check if 24+ hours since created
+            let urgentBadge = '';
+            if (job.created_date) {
+                const createdDate = new Date(job.created_date);
+                const hoursSince = (today - createdDate) / (1000 * 60 * 60);
+                if (hoursSince >= 24) {
+                    urgentBadge = '<span class="text-red-400 text-xs font-bold animate-pulse">🚨 24+ HRS</span>';
+                }
+            }
+            
+            // Store job data for modal
+            const jobDataJson = JSON.stringify(job).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const jobGroupId = job.job_group_id || jobId;
+            const allJobIds = job.all_job_ids ? JSON.stringify(job.all_job_ids).replace(/"/g, '&quot;') : '["' + jobId + '"]';
+            const tasksJson = JSON.stringify(tasks).replace(/"/g, '&quot;');
+            
+            return `<div class="flex items-center justify-between p-3 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 cursor-pointer" onclick='closePendingAcceptModal(); openJobDetailModal(${jobDataJson})'>
+                <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <span class="text-orange-400 text-xs font-bold whitespace-nowrap">${dateLabel}</span>
+                    <span class="text-white text-sm font-semibold truncate">${job.customer_name}</span>
+                    <span class="text-slate-400 text-xs truncate">${job.address || ''}</span>
+                    ${urgentBadge}
+                </div>
+                <div class="flex items-center gap-2 ml-2">
+                    <span class="text-slate-400 text-xs">${getCrewName(job.crew_id || '')}</span>
+                    <button onclick='event.stopPropagation(); closePendingAcceptModal(); openTaskModal("${jobId}", "${jobGroupId}", "${job.customer_name}", ${tasksJson}, ${allJobIds})' class="px-2 py-1 bg-orange-500/30 hover:bg-orange-500/50 text-orange-400 rounded text-xs font-bold">Tasks</button>
+                </div>
+            </div>`;
+        }
 
         function setMarketFilter(market) {
             currentMarketFilter = market;
@@ -659,6 +743,7 @@
             let totalPay = 0;
             let pendingAccept = 0;
             let notAccepted24hrs = [];
+            pendingAcceptJobs = []; // Reset the global list
 
             const now = new Date();
             
@@ -672,6 +757,7 @@
                 
                 if (!isAccepted) {
                     pendingAccept++;
+                    pendingAcceptJobs.push(job); // Add to global list for modal
                     
                     // Check if created over 24 hours ago
                     if (job.created_date) {
@@ -748,12 +834,22 @@
             const jobId = job.job_id || (job.days && job.days[0]?.job_id) || '';
             const needsClose = job.needs_close === true;
             
-            // Get missing tasks
-            const missingTasks = [];
-            if (!(tasks.material_ordered === true || tasks.material_ordered === 'TRUE')) missingTasks.push('MO');
-            if (!(tasks.ho_notified === true || tasks.ho_notified === 'TRUE')) missingTasks.push('HO');
-            if (!(tasks.sub_accepted === true || tasks.sub_accepted === 'TRUE')) missingTasks.push('SA');
-            if (!(tasks.work_order_sent === true || tasks.work_order_sent === 'TRUE')) missingTasks.push('WO');
+            // Get missing tasks with their keys
+            const taskDefs = [
+                { key: 'material_ordered', label: 'MO' },
+                { key: 'ho_notified', label: 'HO' },
+                { key: 'sub_accepted', label: 'SA' },
+                { key: 'work_order_sent', label: 'WO' }
+            ];
+            
+            // Build task badges - show incomplete tasks as clickable
+            const taskBadges = taskDefs.map(t => {
+                const done = tasks[t.key] === true || tasks[t.key] === 'TRUE';
+                if (done) return ''; // Don't show completed tasks
+                return `<button onclick="event.stopPropagation(); quickCompleteTask('${jobId}', '${t.key}', this)" 
+                    class="px-2 py-0.5 bg-red-500/30 hover:bg-green-500/50 border border-red-500/50 hover:border-green-500 text-red-300 hover:text-green-300 rounded text-xs font-bold transition-all"
+                    title="Click to mark ${t.label} complete">${t.label}</button>`;
+            }).filter(b => b).join('');
             
             // Format date
             const scheduledDate = new Date(job.scheduled_date + 'T00:00:00');
@@ -775,22 +871,70 @@
             if (needsClose) {
                 return `<div class="flex items-center justify-between p-2 rounded-lg bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30 cursor-pointer" onclick='openJobDetailModal(${jobDataJson})'>
                     <div class="flex items-center gap-3 flex-1 min-w-0">
-                        <span class="text-purple-400 text-xs font-bold">${dateLabel}</span>
-                        <span class="text-white text-sm truncate">${job.customer_name}</span>
+                        <span class="text-purple-400 text-xs font-bold w-16">${dateLabel}</span>
+                        <span class="text-white text-sm truncate flex-1">${job.customer_name}</span>
                         <span class="text-purple-300 text-xs font-bold animate-pulse">⚠️ CLOSE JOB</span>
                     </div>
-                    <button onclick='event.stopPropagation(); markJobComplete("${jobId}", "${job.customer_name}")' class="px-2 py-1 bg-green-500/30 hover:bg-green-500/50 text-green-400 rounded text-xs font-bold">✓ Done</button>
+                    <button onclick='event.stopPropagation(); markJobComplete("${jobId}", "${job.customer_name}")' class="ml-2 px-2 py-1 bg-green-500/30 hover:bg-green-500/50 text-green-400 rounded text-xs font-bold">✓ Done</button>
                 </div>`;
             }
             
             return `<div class="flex items-center justify-between p-2 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 cursor-pointer" onclick='openJobDetailModal(${jobDataJson})'>
                 <div class="flex items-center gap-3 flex-1 min-w-0">
-                    <span class="text-red-400 text-xs font-bold">${dateLabel}</span>
+                    <span class="text-red-400 text-xs font-bold w-16">${dateLabel}</span>
                     <span class="text-white text-sm truncate">${job.customer_name}</span>
-                    <span class="text-red-400 text-xs">Missing: ${missingTasks.join(', ')}</span>
                 </div>
-                <button onclick='event.stopPropagation(); openTaskModal("${jobId}", "${jobGroupId}", "${job.customer_name}", ${tasksJson}, ${allJobIds})' class="px-2 py-1 bg-orange-500/30 hover:bg-orange-500/50 text-orange-400 rounded text-xs font-bold">Tasks</button>
+                <div class="flex items-center gap-1 ml-2">
+                    ${taskBadges}
+                    <button onclick='event.stopPropagation(); openTaskModal("${jobId}", "${jobGroupId}", "${job.customer_name}", ${tasksJson}, ${allJobIds})' class="ml-1 px-2 py-0.5 bg-slate-500/30 hover:bg-slate-500/50 text-slate-300 rounded text-xs font-bold">All</button>
+                </div>
             </div>`;
+        }
+        
+        // Quick complete a single task
+        async function quickCompleteTask(jobId, taskKey, buttonEl) {
+            // Build task update object - only update the one task
+            const taskUpdate = {
+                job_id: jobId,
+                material_ordered: taskKey === 'material_ordered' ? true : undefined,
+                ho_notified: taskKey === 'ho_notified' ? true : undefined,
+                material_delivered: taskKey === 'material_delivered' ? true : undefined,
+                sub_accepted: taskKey === 'sub_accepted' ? true : undefined,
+                work_order_sent: taskKey === 'work_order_sent' ? true : undefined
+            };
+            
+            // Visual feedback
+            buttonEl.classList.remove('bg-red-500/30', 'border-red-500/50', 'text-red-300');
+            buttonEl.classList.add('bg-green-500/50', 'border-green-500', 'text-green-300');
+            buttonEl.textContent = '✓';
+            
+            try {
+                // Get current tasks first
+                const currentTasks = tasksData[jobId] || {};
+                
+                const response = await fetch(CONFIG.taskUpdateUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        job_id: jobId,
+                        material_ordered: taskKey === 'material_ordered' ? true : (currentTasks.material_ordered === 'TRUE' || currentTasks.material_ordered === true),
+                        ho_notified: taskKey === 'ho_notified' ? true : (currentTasks.ho_notified === 'TRUE' || currentTasks.ho_notified === true),
+                        material_delivered: taskKey === 'material_delivered' ? true : (currentTasks.material_delivered === 'TRUE' || currentTasks.material_delivered === true),
+                        sub_accepted: taskKey === 'sub_accepted' ? true : (currentTasks.sub_accepted === 'TRUE' || currentTasks.sub_accepted === true),
+                        work_order_sent: taskKey === 'work_order_sent' ? true : (currentTasks.work_order_sent === 'TRUE' || currentTasks.work_order_sent === true)
+                    })
+                });
+                
+                if (response.ok) {
+                    // Refresh after short delay
+                    setTimeout(() => loadDashboard(), 500);
+                }
+            } catch (error) {
+                console.error('Error updating task:', error);
+                // Revert visual
+                buttonEl.classList.add('bg-red-500/30', 'border-red-500/50', 'text-red-300');
+                buttonEl.classList.remove('bg-green-500/50', 'border-green-500', 'text-green-300');
+            }
         }
 
         // Group and render jobs by date with headers
